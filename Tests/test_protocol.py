@@ -211,8 +211,14 @@ def test_status_is_authoritative():
 
 # --- standalone (physical control box) ---
 
+def test_standalone_boots_locked():
+    a = Arbiter(IDS)
+    assert a.press("A1") == (False, [])
+
+
 def test_standalone_first_press_wins_silently():
     a = Arbiter(IDS)
+    a.control_press()
     assert a.press("B3") == (True, [])
     assert a.press("A1") == (False, [])
     assert a.winner == "B3"
@@ -220,9 +226,19 @@ def test_standalone_first_press_wins_silently():
 
 def test_standalone_control_press_reopens():
     a = Arbiter(IDS)
+    a.control_press()
     a.press("A1")
     assert a.control_press() == []
+    assert a.winner is None
     assert a.press("A2") == (True, [])
+
+
+def test_bye_locks_standalone_until_control_press():
+    a = armed()
+    a.handle_line("BYE")
+    assert a.press("A1") == (False, [])
+    a.control_press()
+    assert a.press("A1")[0]
 
 
 # --- physical control box while hosted ---

@@ -70,8 +70,9 @@ class Arbiter:
     """Authoritative game state. The engine calls press()/control_press();
     the serial loop calls handle_line(). Both return protocol lines to send.
 
-    In STANDALONE the first press wins and the control button clears it,
-    matching the pre-protocol behaviour. Arm numbers are chosen by the host
+    In STANDALONE the unit boots locked, the control button opens it, and
+    the first press wins and locks it again, matching the pre-protocol
+    behaviour. Arm numbers are chosen by the host
     and must strictly increase, so a repeated or late ARM is rejected.
     """
 
@@ -81,6 +82,7 @@ class Arbiter:
         self.arm = 0
         self.mask = []
         self.winner = None
+        self.open = False  # STANDALONE only: control box has armed the unit
 
     def state_line(self):
         if self.mode == ARMED:
@@ -92,8 +94,9 @@ class Arbiter:
     def press(self, player_id):
         """A button was pressed. Returns (won, lines); lock happens first."""
         if self.mode == STANDALONE:
-            if self.winner is not None or player_id not in self.player_ids:
+            if not self.open or player_id not in self.player_ids:
                 return False, []
+            self.open = False
             self.winner = player_id
             return True, []
         if self.mode != ARMED or player_id not in self.mask:
@@ -104,10 +107,12 @@ class Arbiter:
         return True, ["BUZZ %d %s" % (self.arm, player_id), self.state_line()]
 
     def control_press(self):
-        """Physical control box. Standalone: clear the winner. Hosted: same
-        as RESET (clear and stay closed), pushed so the host is never stale."""
+        """Physical control box. Standalone: clear the winner and open.
+        Hosted: same as RESET (clear and stay closed), pushed so the host is
+        never stale."""
         if self.mode == STANDALONE:
             self.winner = None
+            self.open = True
             return []
         self._clear()
         return [self.state_line()]
@@ -139,6 +144,7 @@ class Arbiter:
             self.mode = STANDALONE
             self.mask = []
             self.winner = None
+            self.open = False  # like boot: control box must arm it again
             return ["OK BYE", self.state_line()]
 
         if self.mode == STANDALONE:
