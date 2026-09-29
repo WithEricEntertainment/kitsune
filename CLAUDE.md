@@ -31,12 +31,21 @@ see "Upstream" at the bottom.
 the protocol must do; that one specifies *how* to build it in this codebase — the actual sequencing,
 state-machine design, and open questions to resolve first.
 
-## Hardware in hand
+## Hardware status
 
-Purchased unit: **Kitsune++ v1.1.0**. In `Firmware/pinouts.py`, `board_pins` currently defaults to
-`p10v1_pins` (the v1.0 pin map) — **this is wrong for this board and must be changed to
-`p10v1p1_pins`** before anything else, and verified against the real hardware (buzz, LEDs, control
-button) before touching protocol code.
+**No Kitsune unit has been ordered yet (as of 2026-09-29).** The target is Kitsune++ v1.1.0, sold
+made-to-order by the designer (see the README). Until one arrives, work is offline-only: Phase 1
+(parser/state machine, `pytest`) and the Phase 2 code can be written and unit-tested, but nothing
+can be verified on-device. The Pi Zero W owned by the maintainer of this fork is a Linux SBC and
+cannot run this MicroPython firmware; a bare Raspberry Pi Pico (~£5) could stand in for protocol
+work (stdin polling, `kbd_intr`, reconnect) but not the MCP23017/control-box path.
+
+In `Firmware/pinouts.py`, `board_pins` currently defaults to `p10v1_pins` (the v1.0 pin map). The
+plan was to switch it to `p10v1p1_pins` for this board, **but as of this writing the two maps have
+identical pins** and differ only in `name` and `default_volume` (30 vs 7). Confirm with the
+upstream maintainer or the v1.1.0 schematic in `PCB/` whether any change is actually needed
+before treating this as a blocking fix. Once hardware exists, verify buzz, LEDs and the control
+button on the real board before touching protocol code.
 
 USB-C is already present on the central control box and already exposes MicroPython's serial REPL
 — no hardware/connector change is needed, only firmware changes to add a real command protocol on
