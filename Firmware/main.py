@@ -3,6 +3,7 @@ import switchboard
 import utime
 from factory import init_hardware, init_ctrl
 from engine import kitsune_engine, player_box
+from hostlink import usb_link
 from pinouts import board_pins, firmware_version
 import os
 import micropython
@@ -12,6 +13,7 @@ gc.enable()
 micropython.alloc_emergency_exception_buf(256)
 
 e = None
+link = None
 
 status_led = machine.Pin(switchboard.status_pin, machine.Pin.OUT)
 
@@ -38,6 +40,8 @@ try:
     cfg = switchboard.runtime_config(switches) # setup runtime config with user_cfg data and switch states
     engine = kitsune_engine(cfg, control_led) # init engine with runtime config
 
+
+    link = usb_link(engine) # host commands over USB serial; idle until the host sends HELLO
 
     players = [player_box(id=p['id'], button_obj=p['btn'], led_obj=p['led'], engine=engine, irq=True) for p in player_data]
 
@@ -105,6 +109,7 @@ try:
     ctrl_was_down = False
     ctrl_last_ms = 0
     while True:
+        link.poll()
         # If the MCP is used for buttons, we poll them here
         # If using IRQs on native pins, this loop stays nearly empty!
         ctrl_down = control_button.value() == 1
@@ -123,3 +128,5 @@ except Exception as e:
     print(str(e))
     #sys.print_exception(e)
     #machine.reset()
+finally:
+    if link: link.close() # never leave Ctrl-C disabled if the script stops
