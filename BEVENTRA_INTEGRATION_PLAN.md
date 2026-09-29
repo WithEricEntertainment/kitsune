@@ -182,3 +182,53 @@ with `BYE`, `mpremote reset`, or replugging).
 `kbd_intr` mechanism generally but don't document rp2-specific buffering), real button-press race
 timing/fairness, and Web Serial's actual handshake with this board's USB descriptor. These stay as
 Phase 0/3 hardware checks, not resolved by this plan.
+
+## Status and next steps (as of 2026-09-29)
+
+**Built offline, all unit-tested on a laptop, nothing pushed anywhere** (`.venv/bin/pytest
+Tests/test_protocol.py Tests/test_engine.py Tests/test_hostlink.py`, 67 tests). Stacked in order:
+
+1. `feature/host-command-parser` — `Firmware/protocol.py` (parser + `Arbiter`), `requirements-dev.txt`.
+2. `feature/engine-state-machine` — `engine.py` driven by the `Arbiter`; `BUZZ` emitted before the sound.
+3. `feature/usb-serial-protocol` — `Firmware/hostlink.py`, `main.py` wiring, `PROTOCOL.md` (the spec).
+
+`beventra-integration` holds only these docs. Merge the three feature branches into it to build a
+flashable version; never merge it back into them.
+
+**Hold:** push nothing and open no upstream issue/PR until the board arrives and the protocol is
+verified on it. The plan is then an upstream issue first ("USB serial control protocol",
+adjacent to the README's own TODO), a PR only if the designer wants it.
+
+**Hardware:** a Kitsune++ v1.1.0 (no cables, shipping waived) was requested by email on
+2026-09-29 (~7 day lead time). Reply sent asks for the 5V buzzer configuration and whether the
+middle USB-C alone can power the board. Payment: PayPal/bank transfer, arranged with the designer.
+
+**When the board arrives, in order**
+1. Middle USB-C to the computer; `mpremote` should list it. Flash stock firmware from `main`
+   (BOOT held while plugging in; `mpremote rm -r :` then `mpremote cp -r . :` from `Firmware/`).
+   Check buzz, LEDs, control button before any of our code.
+2. Merge the three feature branches into `beventra-integration`, flash, and drive it by hand
+   (`mpremote` REPL or a serial terminal): `HELLO 1`, `ARM`, buzz, `RESET`.
+3. Test what could not be tested offline: stdout writes with no host attached (do they block?),
+   near-simultaneous presses on two buzzers (repeat many times), the reconnect sequence, standalone
+   mode via the control box, and one-cable power under load (27V buzzer, if not set to 5V).
+4. Only then: upstream issue, then PRs.
+
+**Decisions where the spec was silent** (also in `PROTOCOL.md`): the control box while hosted acts
+like `RESET` and pushes state; arm numbers must strictly increase (`ERR STALE`); `BYE` returns to
+locked standalone; a repeat `HELLO` keeps state; a `STATE` line follows refusals that leave state
+meaningful. Change these deliberately if Beventra's side needs otherwise.
+
+**Small upstream fixes considered** (all separate `fix/` branches off `main`, none created yet):
+- `fix/player-box-led-attribute`: set `self.led = None` when no LED is passed in `player_box`. No
+  behaviour change; the safe first contribution.
+- `shims.py`: `type(pin_obj) == "VirtualPin"` is always false (class vs. string), so expander pins
+  take the native-pin path and work by accident. A fix could flip button/switch readings, so it
+  needs a board test first. Held.
+- Not worth doing: removing `.pybak` files and dead comments, style changes, restarting on errors
+  in `main.py` (the designer's call).
+
+**Settled along the way:** a stock Pico is not a valid stand-in (firmware assumes the YD-RP2040's
+GP23 NeoPixel and GP25 LED), and a Pi Zero W cannot run this firmware. The two outer USB-C
+sockets are UART daisychain sockets (upstream work, unfinished on the `4.0` branch), unused here.
+Beventra-side work (Web Serial console, `WI-1418`) is a separate repo and not blocked by this one.
