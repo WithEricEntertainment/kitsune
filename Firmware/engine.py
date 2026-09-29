@@ -7,6 +7,7 @@ from machine import PWM, Pin, Timer, disable_irq, enable_irq
 import utime
 from lib.buzzer_music import music
 from pinouts import board_pins
+from protocol import Arbiter, STANDALONE, ARMED
 
 
 class player_box():
@@ -60,9 +61,10 @@ class kitsune_engine():
 
 
 
-    def __init__(self, cfg, control_led):
+    def __init__(self, cfg, control_led, emit=None):
         self.cfg = cfg
-        self.locked = True
+        self.arbiter = Arbiter(board_pins["ids"])
+        self.emit = emit or (lambda lines: None)  # sends protocol lines to the host
         self.active_player = None
         self.refractory = False
         self.ref_timer = Timer(-1)
@@ -70,14 +72,24 @@ class kitsune_engine():
         self.team_offset = 1 # frequency coefficient to vary buzz sound by team
         print("Init engine")
 
+    @property
+    def locked(self):
+        """True whenever a button press cannot win (main loop polls this to watch for reset)."""
+        a = self.arbiter
+        return not (a.open if a.mode == STANDALONE else a.mode == ARMED)
+
     def handle_buzz(self, player):
-        if self.locked or self.refractory: return
-        
-        self.locked = True
-        self.control_led.off()
+        if self.refractory: return
+
+        # Lock and record the winner first; nothing slow happens before this.
+        won, lines = self.arbiter.press(player.id)
+        if not won: return
+
         self.active_player = player
         player.update_led(1)
-        
+        self.emit(lines) # tell the host before the ~625ms buzz below
+        self.control_led.off()
+
         if "A" in player.id:
             self.cfg.pixel.fill(self.cfg.team_a_colour)
             self.team_offset = self.cfg.team_a_freq_offset
@@ -91,29 +103,51 @@ class kitsune_engine():
 
         print(f"Buzzer locked by {player.id}")
         self.buzz(self.cfg)
-        if self.cfg.autoreset:
-            Timer(-1).init(mode=Timer.ONE_SHOT, period=self.cfg.reset_duration, callback=self.reset)
+        # Autoreset only makes sense with no host; a host must never see a silent reopen.
+        if self.cfg.autoreset and self.arbiter.mode == STANDALONE:
+            Timer(-1).init(mode=Timer.ONE_SHOT, period=self.cfg.reset_duration, callback=self._autoreset)
+
+    def _autoreset(self, _):
+        if self.arbiter.mode == STANDALONE: # a host may have connected since the timer started
+            self.reset()
 
     def reset(self, *args):
+        """Control-box reset. Standalone: reopen. Hosted: clear winner and stay closed."""
+        lines = self.arbiter.control_press()
+        self._sync_outputs()
+        self.emit(lines)
 
-        self.cfg.pixel.fill(self.cfg.armed_colour)
+    def handle_command(self, line):
+        """One host command line in; state applied to the hardware, reply lines out."""
+        lines = self.arbiter.handle_line(line)
+        self._sync_outputs()
+        self.emit(lines)
+
+    def _sync_outputs(self):
+        """Make LEDs match the arbiter. Winner-lighting is done in handle_buzz."""
+        a = self.arbiter
+        if a.winner is None and self.active_player:
+            self.active_player.update_led(0)
+            self.active_player = None
+        if a.winner is not None:
+            return
+        armed = a.open if a.mode == STANDALONE else a.mode == ARMED
+        self.cfg.pixel.fill(self.cfg.armed_colour if armed else (0, 0, 0))
         self.cfg.pixel.write()
-        self.control_led.on()
+        if armed:
+            self.control_led.on()
+        else:
+            self.control_led.off()
 
-        self.refractory = True
-        self.locked = False
-        if self.active_player: self.active_player.update_led(0)
-        self.active_player = None
+        if armed and a.mode == STANDALONE:
+            # Brief debounce so the press that reset us can't also win.
+            self.refractory = True
+            self.ref_timer.init(mode=Timer.ONE_SHOT, period=20, callback=self.reset_refractory)
 
-        print ("Resetting")
-
-        # Use timer to clear refractory period
-        self.ref_timer.init(mode=Timer.ONE_SHOT, period=20, callback=self.reset_refractory)
-        
     def reset_refractory(self, _):
         self.refractory = False
         print("cleared refractory period")
-        
+
 
 
     def buzz(self, config=None):
