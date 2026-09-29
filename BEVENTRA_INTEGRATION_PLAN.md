@@ -130,11 +130,12 @@ better to catch it in a fast local test loop than in on-device debugging.
 
 ## Sequencing
 
-- **Phase 0 — hardware sanity, blocks everything else.** Fix the pin map default
-  (`p10v1p1_pins`), flash stock-equivalent firmware, run the doc's existing two-handheld
-  acceptance steps (buzz/LED/control button) with *no* protocol code yet. If this doesn't pass,
-  nothing downstream matters.
-- **Phase 1 — offline, no hardware required, can start now (or even before Phase 0/purchase).**
+- **Phase 0 — hardware sanity, blocks on-device validation.** Once the unit arrives: plug the
+  middle USB-C into the computer, confirm `mpremote` sees it, flash stock-equivalent firmware, and
+  run the existing two-handheld checks (buzz/LED/control button) with *no* protocol code. (An
+  earlier draft called for switching `board_pins` to `p10v1p1_pins`; the v1.0/v1.1.0 maps have
+  identical pins, so this is optional and only changes the default volume.)
+- **Phase 1 — offline, no hardware required, can start now (done: `feature/host-command-parser`).**
   Write the protocol parser + state machine as a standalone module, with `pytest` coverage for:
   valid `ARM`/`CLOSE`/`RESET`/`STATUS` transitions, rejected presses outside the eligible mask,
   stale-arm-number rejection, and malformed-line handling.
@@ -171,6 +172,11 @@ need turns up later (unlikely, but possible once Phase 2 implementation starts),
 `[beventra-only]` explicitly here rather than letting it blend into the `[core]` work.
 
 ## Still not resolvable without the physical board
+
+Also open: whether writes to `sys.stdout` block when no host is attached (would delay the `BUZZ`
+emit and the buzz sound), whether power sources on the outer USB-C sockets are safe alongside the
+middle port, and that a script holding `kbd_intr(-1)` cannot be interrupted over serial (recover
+with `BYE`, `mpremote reset`, or replugging).
 
 `select.poll(sys.stdin)` behavior specifically on the `rp2` port's USB CDC driver (docs confirm the
 `kbd_intr` mechanism generally but don't document rp2-specific buffering), real button-press race

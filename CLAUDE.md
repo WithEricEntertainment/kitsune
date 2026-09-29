@@ -33,23 +33,38 @@ state-machine design, and open questions to resolve first.
 
 ## Hardware status
 
-**No Kitsune unit has been ordered yet (as of 2026-09-29).** The target is Kitsune++ v1.1.0, sold
-made-to-order by the designer (see the README). Until one arrives, work is offline-only: Phase 1
-(parser/state machine, `pytest`) and the Phase 2 code can be written and unit-tested, but nothing
-can be verified on-device. The Pi Zero W owned by the maintainer of this fork is a Linux SBC and
-cannot run this MicroPython firmware; a bare Raspberry Pi Pico (~£5) could stand in for protocol
-work (stdin polling, `kbd_intr`, reconnect) but not the MCP23017/control-box path.
+**No Kitsune unit has been received yet (as of 2026-09-29).** A Kitsune++ v1.1.0 (no cables) was
+requested from the designer, who ships made-to-order within about 7 days; payment and shipping
+were being arranged by email. Until it arrives, work is offline-only: the parser/arbiter and
+engine changes are unit-tested on a laptop (`Tests/test_protocol.py`, `Tests/test_engine.py`) but
+nothing is verified on-device. The Pi Zero W owned by the maintainer of this fork is a Linux SBC
+and cannot run this firmware.
 
-In `Firmware/pinouts.py`, `board_pins` currently defaults to `p10v1_pins` (the v1.0 pin map). The
-plan was to switch it to `p10v1p1_pins` for this board, **but as of this writing the two maps have
-identical pins** and differ only in `name` and `default_volume` (30 vs 7). Confirm with the
-upstream maintainer or the v1.1.0 schematic in `PCB/` whether any change is actually needed
-before treating this as a blocking fix. Once hardware exists, verify buzz, LEDs and the control
-button on the real board before touching protocol code.
+**What the repo's hardware files and photos establish** (from the KiCad schematics in `PCB/` and
+the README photos; the designer also confirmed the port count by email):
+- One RP2040, on a **YD-RP2040** module (Pico form factor, onboard NeoPixel on GP23 and LED on
+  GP25 — this is why `switchboard.py` uses those pins). A stock Pico is *not* an equivalent
+  stand-in.
+- Three USB-C connectors on one board edge. The **outer two are the daisychain sockets, wired as
+  UART** (upstream GP4/GP5, downstream GP0/GP1), not USB data. The **middle one is the YD-RP2040's
+  own USB-C**: it powers the board and carries USB serial (MicroPython REPL, flashing via the
+  RPI-RP2 drive). Development and the Beventra host link both use that one cable.
+- The module's VBUS pin is tied to the board's 5V rail. **Use only the middle port for power**
+  until the designer confirms it is safe to have a second source on an outer socket.
+- 11 audio jacks: `A1`-`A5`, `B1`-`B5` (players) and `CTRL`. v1.0 and v1.1.0 have the same ports
+  and identical pin maps in `pinouts.py` (only `default_volume` differs: 30 vs 7); v1.1.0 adds a
+  27V buzzer boost converter that can be bypassed with solder jumpers. So the "wrong pin map"
+  concern from earlier notes is a non-issue; `p10v1p1_pins` only changes the default volume.
+- Player buttons are native GPIOs (IRQ); LEDs and DIP switches go through an MCP23017 over I2C, so
+  the winner-LED write in `handle_buzz` is a short I2C transaction before the `BUZZ` line is sent.
+- Flashing (upstream wiki): hold BOOT (small hole in the case top) while plugging in, drag the
+  MicroPython `.uf2` onto RPI-RP2, then `mpremote rm -r :` and `mpremote cp -r . :` from `Firmware/`.
 
-USB-C is already present on the central control box and already exposes MicroPython's serial REPL
-— no hardware/connector change is needed, only firmware changes to add a real command protocol on
-top of (or instead of) the raw REPL.
+Upstream also has a `4.0` branch (May 2026, older than `main`) adding daisychain scaffolding to
+`engine.py`/`factory.py`/`main.py`; keep diffs to those files small to limit conflicts.
+
+Once hardware exists, verify buzz, LEDs and the control button on the real board before trusting
+any protocol behaviour.
 
 ## Current firmware architecture (as of the fork point)
 
