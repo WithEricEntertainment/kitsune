@@ -183,20 +183,21 @@ with `BYE`, `mpremote reset`, or replugging).
 timing/fairness, and Web Serial's actual handshake with this board's USB descriptor. These stay as
 Phase 0/3 hardware checks, not resolved by this plan.
 
-## Status and next steps (as of 2026-09-29)
+## Status and next steps (as of 2026-09-30)
 
-**Built offline, all unit-tested on a laptop, nothing pushed anywhere** (`.venv/bin/pytest
+**Built offline, all unit-tested on a laptop, pushed to the fork (`origin`) only** (`.venv/bin/pytest
 Tests/test_protocol.py Tests/test_engine.py Tests/test_hostlink.py`, 67 tests). Stacked in order:
 
 1. `feature/host-command-parser` — `Firmware/protocol.py` (parser + `Arbiter`), `requirements-dev.txt`.
 2. `feature/engine-state-machine` — `engine.py` driven by the `Arbiter`; `BUZZ` emitted before the sound.
 3. `feature/usb-serial-protocol` — `Firmware/hostlink.py`, `main.py` wiring, `PROTOCOL.md` (the spec).
 
-`beventra-integration` holds only these docs. Merge the three feature branches into it to build a
-flashable version; never merge it back into them.
+`beventra-integration` holds these docs and, since 2026-09-30, a merge of `feature/usb-serial-protocol`
+(so the spec, `PROTOCOL.md`, and the code sit together for the Beventra side to read); never merge it
+back into the feature branches. `PROTOCOL.md` is the authoritative wire format: change it there first.
 
-**Hold:** push nothing and open no upstream issue/PR until the board arrives and the protocol is
-verified on it. The plan is then an upstream issue first ("USB serial control protocol",
+**Hold (upstream only):** the four branches were pushed to the fork on 2026-09-30, but open no upstream
+issue/PR until the board arrives and the protocol is verified on it. The plan is then an upstream issue first ("USB serial control protocol",
 adjacent to the README's own TODO), a PR only if the designer wants it.
 
 **Hardware:** a Kitsune++ v1.1.0 (no cables, shipping waived) was requested by email on
