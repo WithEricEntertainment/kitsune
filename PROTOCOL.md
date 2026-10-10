@@ -129,5 +129,6 @@ Practical notes found on the board:
 - `mpremote` cannot connect while the board is in host mode (Ctrl-C is off); send `BYE` or replug.
   After any `mpremote` use the board is left at the MicroPython prompt; run `mpremote reset`.
 - `BYE` keeps the last arm number; only a reboot resets it to 0.
-- The board's own `Firmware/pinouts.py` selects `p10v1p1_pins` (v1.1.0). The repo copy selects
-  `p10v1_pins`; don't overwrite the board's with it.
+- The board's own `Firmware/pinouts.py` selects `p10v1p1_pins` (the v1.1.0 map, default volume 7); the repo
+  copy selects `p10v1_pins` (default volume 30). The two maps have identical pins, so the only effect of
+  overwriting the board's copy is a louder default buzzer, which matters with the 27V buzzer.
