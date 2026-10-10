@@ -123,7 +123,7 @@ active winner (if any). This is what both reconnect-reconciliation and the accep
 Pull the protocol parser/state machine into a plain-Python module, testable off-device.**
 Command parsing (`"ARM 42 A1,A2,..."` → structured command) and the state-transition logic don't
 need `machine`/`utime`/hardware — write them with no MicroPython-only imports, unit-test with
-ordinary `pytest` on a laptop, then import the same file unmodified on the device. This is the
+ordinary `pytest` under CPython, then import the same file unmodified on the device. This is the
 part of the work that genuinely doesn't need the Pico spike or the board at all, and is where most
 of the bug surface (malformed lines, wrong transitions, double-buzz edge cases) actually lives —
 better to catch it in a fast local test loop than in on-device debugging.
@@ -183,9 +183,18 @@ with `BYE`, `mpremote reset`, or replugging).
 timing/fairness, and Web Serial's actual handshake with this board's USB descriptor. These stay as
 Phase 0/3 hardware checks, not resolved by this plan.
 
+## Bring-up results (2026-10-10)
+
+The board arrived and steps 1-3 of the checklist below were done on it; details and gotchas are at
+the end of `PROTOCOL.md`. Summary: stock firmware worked (DIP switch 1 = debug, was on at arrival);
+our firmware booted; the protocol works end to end; one real bug found and fixed (`ProtocolError`
+called `Exception.__init__`, which MicroPython lacks; commit `e4e11bd` on `beventra-integration`,
+feature branches not yet patched). Reconnect, two-box race (20 tries), standalone and one-cable power
+all passed. Still open: host mode with the host gone, true same-ms presses. Upstream stays on hold.
+
 ## Status and next steps (as of 2026-09-30)
 
-**Built offline, all unit-tested on a laptop, pushed to the fork (`origin`) only** (`.venv/bin/pytest
+**Built offline, all unit-tested under CPython, pushed to the fork (`origin`) only** (`.venv/bin/pytest
 Tests/test_protocol.py Tests/test_engine.py Tests/test_hostlink.py`, 67 tests). Stacked in order:
 
 1. `feature/host-command-parser` — `Firmware/protocol.py` (parser + `Arbiter`), `requirements-dev.txt`.

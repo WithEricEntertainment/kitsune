@@ -5,8 +5,8 @@ USB serial port and be told who buzzed in first. The buzzer box decides the winn
 host never sits in the decision path.
 
 The reference implementation is `Firmware/protocol.py` (parsing and state) and
-`Firmware/hostlink.py` (serial I/O). Tests are in `Tests/`. **Status: unit-tested on a laptop;
-not yet verified on a real board.**
+`Firmware/hostlink.py` (serial I/O). Tests are in `Tests/`. **Status: unit-tested under CPython
+(regular Python on a computer) and verified on a real Kitsune++ v1.1.0 on 2026-10-10; see the end of this file.**
 
 ## Connecting
 
@@ -99,7 +99,28 @@ device KIT STATE 42 CLOSED
 - **Ctrl-C is off** between `HELLO` and `BYE`, so a running script can't be interrupted over
   serial. Recover with `BYE`, `mpremote reset`, or unplugging.
 
-## Not yet verified on hardware
+## Verified on hardware (2026-10-10, Kitsune++ v1.1.0, MicroPython 1.27)
 
-Whether writes block when no host is attached, behaviour under near-simultaneous presses, and
-the reconnect sequence.
+Checked on a real board over its middle USB-C port:
+
+- Every command and the error replies (`NOHOST`, `STALE`, `BADID`, `UNKNOWN`) answer as documented.
+- A real button press produces `BUZZ` then `LOCKED`, and `RESET`/`CLOSE`/`BYE` return the right state.
+- Reconnect: dropping the serial connection without `BYE` keeps state, and `HELLO 1` reports it. A real
+  unplug and replug reboots the board to `STANDALONE`, arm 0.
+- Two boxes (A4, B4), 20 near-simultaneous tries: exactly one winner each time (A4 11, B4 9), no
+  errors. Human timing only; not proof of millisecond-level fairness.
+- Standalone with nothing reading the port: no delay. One cable (middle USB-C, 27V buzzer): no resets
+  or disconnects across the session.
+
+Still open: host mode with the host gone and a press, true same-millisecond presses, weak USB chargers.
+
+Practical notes found on the board:
+
+- Stray bytes in the input line (e.g. Linux ModemManager probing a newly attached serial device) make
+  the next command fail once with `ERR UNKNOWN`. Hosts should send a blank line before `HELLO 1`
+  and ignore any line that doesn't start with `KIT `.
+- `mpremote` cannot connect while the board is in host mode (Ctrl-C is off); send `BYE` or replug.
+  After any `mpremote` use the board is left at the MicroPython prompt; run `mpremote reset`.
+- `BYE` keeps the last arm number; only a reboot resets it to 0.
+- The board's own `Firmware/pinouts.py` selects `p10v1p1_pins` (v1.1.0). The repo copy selects
+  `p10v1_pins`; don't overwrite the board's with it.

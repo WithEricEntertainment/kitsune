@@ -33,12 +33,10 @@ state-machine design, and open questions to resolve first.
 
 ## Hardware status
 
-**No Kitsune unit has been received yet (as of 2026-09-29).** A Kitsune++ v1.1.0 (no cables) was
-requested from the designer, who ships made-to-order within about 7 days; payment and shipping
-were being arranged by email. Until it arrives, work is offline-only: the parser/arbiter and
-engine changes are unit-tested on a laptop (`Tests/test_protocol.py`, `Tests/test_engine.py`) but
-nothing is verified on-device. The Pi Zero W owned by the maintainer of this fork is a Linux SBC
-and cannot run this firmware.
+**A Kitsune++ v1.1.0 arrived 2026-10-10 and the protocol is verified on it** (results and
+gotchas at the end of `PROTOCOL.md`). The code was first unit-tested under CPython (regular Python
+on a computer), which cannot catch MicroPython-only problems (it missed a crash in `ProtocolError`).
+The Pi Zero W owned by the maintainer of this fork is a Linux SBC and cannot run this firmware.
 
 **What the repo's hardware files and photos establish** (from the KiCad schematics in `PCB/` and
 the README photos; the designer also confirmed the port count by email):
