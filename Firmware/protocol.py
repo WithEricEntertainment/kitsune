@@ -18,7 +18,6 @@ LOCKED = "LOCKED"  # host connected, a winner is held until RESET/ARM
 
 class ProtocolError(Exception):
     def __init__(self, code):
-        Exception.__init__(self, code)
         self.code = code
 
 
