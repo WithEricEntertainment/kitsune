@@ -109,10 +109,13 @@ Checked on a real board over its middle USB-C port:
   unplug and replug reboots the board to `STANDALONE`, arm 0.
 - Two boxes (A4, B4), 20 near-simultaneous tries: exactly one winner each time (A4 11, B4 9), no
   errors. Human timing only; not proof of millisecond-level fairness.
+- Host gone mid-round (serial closed without `BYE`, armed): a press still sounds instantly and the winner
+  is held. The `BUZZ` line sent while nobody was reading is lost, but `HELLO 1` on reconnect reports
+  `STATE <arm> LOCKED <id>`, so hosts must recover the winner from that, not from `BUZZ` alone.
 - Standalone with nothing reading the port: no delay. One cable (middle USB-C, 27V buzzer): no resets
   or disconnects across the session.
 
-Still open: host mode with the host gone and a press, true same-millisecond presses, weak USB chargers.
+Still open: true same-millisecond presses, weak USB chargers.
 
 Practical notes found on the board:
 
