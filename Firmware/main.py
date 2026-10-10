@@ -106,16 +106,22 @@ try:
 #cfg.buzzer.deinit()
 #cfg.buzzer_pin.high()
 # 2. Main Loop
+    ctrl_was_down = False
+    ctrl_last_ms = 0
     while True:
         link.poll()
         # If the MCP is used for buttons, we poll them here
         # If using IRQs on native pins, this loop stays nearly empty!
-        if engine.locked:
-            # Check for Reset button press
-            if control_button.value() == 1:
+        ctrl_down = control_button.value() == 1
+        # Act once per press (rising edge, 50 ms bounce guard): a held button must not
+        # re-run reset every loop pass, which floods a hosted link with STATE lines.
+        if ctrl_down and not ctrl_was_down and engine.locked:
+            now = utime.ticks_ms()
+            if utime.ticks_diff(now, ctrl_last_ms) > 50:
+                ctrl_last_ms = now
                 gc.collect()
                 engine.reset()
-            pass                                 
+        ctrl_was_down = ctrl_down
 
 except Exception as e:
     #cfg.buzzer.duty_u16(0)
