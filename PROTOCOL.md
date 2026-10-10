@@ -33,6 +33,7 @@ device starts with `KIT `; **the host must ignore any line that doesn't**.
 | `CLOSED` | Host connected, nobody can win. |
 | `ARMED` | Host connected; only the listed players can win. |
 | `LOCKED` | Host connected; a winner is held until `RESET` or the next `ARM`. |
+| `CHECK` | Host connected; roll-call (see `CHECK` below). Every port is live and nobody wins. |
 
 ## Host to device
 
@@ -41,6 +42,7 @@ device starts with `KIT `; **the host must ignore any line that doesn't**.
 | `HELLO 1` | Enter host mode (version must be 1, else `ERR VERSION`). From standalone this goes to `CLOSED`. Sent again while already hosted (e.g. after a reconnect) it changes nothing and just reports the current state. Disables Ctrl-C on the serial port. |
 | `ARM <arm> <ids>` | Clear any winner and allow only the listed players (comma-separated, e.g. `A1,A2,B1`) to win. `<arm>` must be greater than every previous arm number (`ERR STALE` otherwise). An unknown ID gives `ERR BADID` and changes nothing. Allowed from any hosted state. |
 | `CLOSE [<arm>]` | Stop new winners. An existing winner is kept (`LOCKED` stays `LOCKED`). |
+| `CHECK` | Start a roll-call (**Beventra extension, not part of the upstream-style core**). Every port goes live and each port's first press lights its LED and keeps it lit; there is no lockout, no winner and no buzzer sound. Sent again, it starts a fresh roll-call. Does not change the arm number. Ended by `RESET`, `CLOSE`, `ARM`, `BYE` or the control box, which turn the LEDs off. |
 | `RESET [<arm>]` | Clear the winner and go to `CLOSED`. It never reopens; `ARM` is required for that. |
 | `STATUS` | Report the current state. |
 | `BYE` | Leave host mode: back to `STANDALONE`, locked until the control box opens it, and Ctrl-C is restored. |
@@ -56,6 +58,7 @@ If `<arm>` is given to `CLOSE`/`RESET` and isn't the current arm, the command is
 | `STATE <arm> STANDALONE` or `CLOSED` | Current mode. `<arm>` is the latest arm number (0 before any). |
 | `STATE <arm> ARMED <ids>` | Armed, with the eligible players in port order. |
 | `STATE <arm> LOCKED <id>` | Locked with this winner. |
+| `STATE <arm> CHECK [<ids>]` | Roll-call in progress, with the ports pressed so far in port order (no ids yet: just `CHECK`). Pushed each time a new port is pressed; repeat presses send nothing. The board has no timer: the host decides when the roll-call is over and sends `RESET`. Presses are counted until then. |
 | `BUZZ <arm> <id>` | A player won. Sent as soon as the winner is locked, *before* the buzzer sound plays, and always followed by `STATE <arm> LOCKED <id>`. |
 | `ERR <code>` | The command was refused. |
 
@@ -99,6 +102,22 @@ device KIT STATE 42 CLOSED
 - **Ctrl-C is off** between `HELLO` and `BYE`, so a running script can't be interrupted over
   serial. Recover with `BYE`, `mpremote reset`, or unplugging.
 
+## Roll-call example
+
+```text
+host   CHECK
+device KIT OK CHECK
+device KIT STATE 0 CHECK
+        ... A4 presses, then B4 ...
+device KIT STATE 0 CHECK A4
+device KIT STATE 0 CHECK A4,B4
+host   RESET
+device KIT OK RESET
+device KIT STATE 0 CLOSED
+```
+
+An older firmware answers `CHECK` with `ERR UNKNOWN`.
+
 ## Verified on hardware
 
 Checked on a Kitsune++ v1.1.0 board (MicroPython 1.27) over its middle USB-C port:
@@ -112,8 +131,12 @@ Checked on a Kitsune++ v1.1.0 board (MicroPython 1.27) over its middle USB-C por
 - Host gone mid-round (serial closed without `BYE`, armed): a press still sounds instantly and the winner
   is held. The `BUZZ` line sent while nobody was reading is lost, but `HELLO 1` on reconnect reports
   `STATE <arm> LOCKED <id>`, so hosts must recover the winner from that, not from `BUZZ` alone.
+- `CHECK` roll-call: two boxes pressed together each pushed one `STATE <arm> CHECK` line, the set grew
+  in order, the LEDs stayed lit until `RESET`, then went out. Presses are counted until the host resets.
 - Control box in host mode: no effect while armed; after a buzz it acts as `RESET` and pushes one
   `STATE <arm> CLOSED` line per press.
+- `CHECK` roll-call: two boxes pressed together each pushed one `STATE <arm> CHECK` line, the set grew
+  in order, the LEDs stayed lit until `RESET`, then went out.
 - Standalone with nothing reading the port: no delay. One cable (middle USB-C, 27V buzzer): no resets
   or disconnects across the session.
 

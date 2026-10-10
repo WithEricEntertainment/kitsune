@@ -7,6 +7,8 @@ import os
 import sys
 import types
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Firmware"))
 
 
@@ -253,3 +255,54 @@ def test_bye_returns_to_locked_standalone():
     finish_refractory(e)
     e.handle_buzz(p["A1"])
     assert e.active_player is p["A1"]
+
+
+# --- CHECK (roll-call) [beventra-only] ---
+
+def test_check_lights_each_pressed_box_and_keeps_it_lit_with_no_sound():
+    e, p, led, events, sent, cfg = make()
+    host(e)
+    e.handle_command("CHECK")
+    del sent[:]
+    events.clear()
+    e.handle_buzz(p["A2"])
+    e.handle_buzz(p["B1"])
+    e.handle_buzz(p["A2"])  # a repeat press does nothing
+    assert p["A2"].led.lit and p["B1"].led.lit and not p["A1"].led.lit
+    assert sent == ["STATE 0 CHECK A2", "STATE 0 CHECK A2,B1"]
+    assert ("buzz",) not in events  # silent
+    assert e.active_player is None and e.locked
+
+
+@pytest.mark.parametrize("cmd", ["RESET", "CLOSE", "ARM 1 A1"])
+def test_check_leds_go_out_when_the_roll_call_ends(cmd):
+    e, p, led, events, sent, cfg = make()
+    host(e)
+    e.handle_command("CHECK")
+    e.handle_buzz(p["A1"])
+    e.handle_buzz(p["B1"])
+    e.handle_command(cmd)
+    assert not p["A1"].led.lit and not p["B1"].led.lit
+    assert e.check_lit == {}
+
+
+def test_a_fresh_check_clears_the_previous_roll_call_leds():
+    e, p, led, events, sent, cfg = make()
+    host(e)
+    e.handle_command("CHECK")
+    e.handle_buzz(p["A1"])
+    e.handle_command("CHECK")
+    assert not p["A1"].led.lit
+    e.handle_buzz(p["A2"])
+    assert p["A2"].led.lit and not p["A1"].led.lit
+
+
+def test_control_box_ends_the_roll_call_and_clears_leds():
+    e, p, led, events, sent, cfg = make()
+    host(e)
+    e.handle_command("CHECK")
+    e.handle_buzz(p["A1"])
+    del sent[:]
+    e.reset()
+    assert sent == ["STATE 0 CLOSED"]
+    assert not p["A1"].led.lit

@@ -249,3 +249,77 @@ def test_hosted_control_press_resets_closed_and_pushes_state():
     assert a.control_press() == ["STATE 4 CLOSED"]
     assert a.winner is None
     assert a.press("A1") == (False, [])
+
+
+# --- CHECK (roll-call) [beventra-only] ---
+
+def test_parse_check_takes_no_arguments():
+    assert parse_command("check") == ("CHECK", [])
+    with pytest.raises(ProtocolError) as e:
+        parse_command("CHECK A1")
+    assert e.value.code == "SYNTAX"
+
+
+def test_check_needs_a_host():
+    a = Arbiter(IDS)
+    assert a.handle_line("CHECK") == ["ERR NOHOST", "STATE 0 STANDALONE"]
+
+
+def test_check_starts_empty_and_keeps_the_arm_number():
+    a = armed(arm=9)
+    assert a.handle_line("CHECK") == ["OK CHECK", "STATE 9 CHECK"]
+    assert a.mode == "CHECK"
+
+
+def test_check_records_each_port_once_in_port_order_without_locking():
+    a = hosted()
+    a.handle_line("CHECK")
+    assert a.press("B1") == (False, ["STATE 0 CHECK B1"])
+    assert a.press("A2") == (False, ["STATE 0 CHECK A2,B1"])
+    assert a.press("A2") == (False, [])  # a repeat press adds nothing
+    assert a.press("A4") == (False, ["STATE 0 CHECK A2,A4,B1"])
+    assert a.mode == "CHECK" and a.winner is None
+    assert a.handle_line("STATUS") == ["OK STATUS", "STATE 0 CHECK A2,A4,B1"]
+
+
+def test_check_ignores_unknown_ports():
+    a = hosted()
+    a.handle_line("CHECK")
+    assert a.press("Z9") == (False, [])
+
+
+@pytest.mark.parametrize("line,state", [
+    ("RESET", "STATE 0 CLOSED"),
+    ("CLOSE", "STATE 0 CLOSED"),
+    ("ARM 1 A1", "STATE 1 ARMED A1"),
+])
+def test_check_ends_on_reset_close_or_arm(line, state):
+    a = hosted()
+    a.handle_line("CHECK")
+    a.press("A1")
+    assert a.handle_line(line)[-1] == state
+    assert a.seen == []
+
+
+def test_control_box_ends_check_and_pushes_state():
+    a = hosted()
+    a.handle_line("CHECK")
+    a.press("A1")
+    assert a.control_press() == ["STATE 0 CLOSED"]
+    assert a.seen == []
+
+
+def test_repeat_check_starts_a_fresh_roll_call():
+    a = hosted()
+    a.handle_line("CHECK")
+    a.press("A1")
+    assert a.handle_line("CHECK") == ["OK CHECK", "STATE 0 CHECK"]
+    assert a.seen == []
+
+
+def test_bye_leaves_check():
+    a = hosted()
+    a.handle_line("CHECK")
+    a.press("A1")
+    a.handle_line("BYE")
+    assert a.mode == "STANDALONE" and a.seen == []

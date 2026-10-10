@@ -7,7 +7,7 @@ from machine import PWM, Pin, Timer, disable_irq, enable_irq
 import utime
 from lib.buzzer_music import music
 from pinouts import board_pins
-from protocol import Arbiter, STANDALONE, ARMED
+from protocol import Arbiter, STANDALONE, ARMED, CHECK
 
 
 class player_box():
@@ -66,6 +66,7 @@ class kitsune_engine():
         self.arbiter = Arbiter(board_pins["ids"])
         self.emit = emit or (lambda lines: None)  # sends protocol lines to the host
         self.active_player = None
+        self.check_lit = {}  # CHECK roll-call: port id -> player whose LED is held on
         self.refractory = False
         self.ref_timer = Timer(-1)
         self.control_led = control_led
@@ -83,6 +84,13 @@ class kitsune_engine():
 
         # Lock and record the winner first; nothing slow happens before this.
         won, lines = self.arbiter.press(player.id)
+        if self.arbiter.mode == CHECK:
+            # Roll-call: light the box and keep it lit, tell the host, make no sound.
+            if lines:
+                self.check_lit[player.id] = player
+                player.update_led(1)
+                self.emit(lines)
+            return
         if not won: return
 
         self.active_player = player
@@ -126,6 +134,10 @@ class kitsune_engine():
     def _sync_outputs(self):
         """Make LEDs match the arbiter. Winner-lighting is done in handle_buzz."""
         a = self.arbiter
+        keep = a.seen if a.mode == CHECK else []
+        for pid in list(self.check_lit):
+            if pid not in keep:  # left CHECK, or a fresh roll-call started
+                self.check_lit.pop(pid).update_led(0)
         if a.winner is None and self.active_player:
             self.active_player.update_led(0)
             self.active_player = None
