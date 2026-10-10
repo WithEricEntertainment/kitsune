@@ -5,7 +5,7 @@
 # reads stdin; callers feed it lines and send back whatever lines it returns.
 #
 # Wire format is one space-delimited line per message.
-#   host -> device:  HELLO 1 | ARM <arm> <ids> | CLOSE [<arm>] | RESET [<arm>] | STATUS | BYE
+#   host -> device:  HELLO 1 | ARM <arm> <ids> | CHECK | CLOSE [<arm>] | RESET [<arm>] | STATUS | BYE
 #   device -> host:  OK <cmd> [...] | ERR <code> | STATE <arm> <state> [...] | BUZZ <arm> <id>
 
 PROTO_VERSION = 1
@@ -14,6 +14,7 @@ STANDALONE = "STANDALONE"  # no host: physical control box in charge
 CLOSED = "CLOSED"  # host connected, nobody may win
 ARMED = "ARMED"  # host connected, listed players may win
 LOCKED = "LOCKED"  # host connected, a winner is held until RESET/ARM
+CHECK = "CHECK"  # host connected, roll-call: every port live, each first press recorded, no winner
 
 
 class ProtocolError(Exception):
@@ -44,6 +45,10 @@ def parse_command(line):
         if "" in ids:
             raise ProtocolError("SYNTAX")
         return name, [_int(args[0]), ids]
+    if name == "CHECK":
+        if args:
+            raise ProtocolError("SYNTAX")
+        return name, []
     if name == "CLOSE" or name == "RESET":
         if len(args) > 1:
             raise ProtocolError("SYNTAX")
@@ -82,12 +87,17 @@ class Arbiter:
         self.mask = []
         self.winner = None
         self.open = False  # STANDALONE only: control box has armed the unit
+        self.seen = []  # CHECK only: ports pressed so far, in port order
 
     def state_line(self):
         if self.mode == ARMED:
             return "STATE %d ARMED %s" % (self.arm, ",".join(self.mask))
         if self.mode == LOCKED:
             return "STATE %d LOCKED %s" % (self.arm, self.winner)
+        if self.mode == CHECK:
+            if self.seen:
+                return "STATE %d CHECK %s" % (self.arm, ",".join(self.seen))
+            return "STATE %d CHECK" % self.arm
         return "STATE %d %s" % (self.arm, self.mode)
 
     def press(self, player_id):
@@ -98,6 +108,12 @@ class Arbiter:
             self.open = False
             self.winner = player_id
             return True, []
+        if self.mode == CHECK:
+            # Roll-call: record each port once, never lock. The line is sent only when the set grows.
+            if player_id not in self.player_ids or player_id in self.seen:
+                return False, []
+            self.seen = [p for p in self.player_ids if p in self.seen or p == player_id]
+            return False, [self.state_line()]
         if self.mode != ARMED or player_id not in self.mask:
             return False, []
         self.mode = LOCKED
@@ -143,6 +159,7 @@ class Arbiter:
             self.mode = STANDALONE
             self.mask = []
             self.winner = None
+            self.seen = []
             self.open = False  # like boot: control box must arm it again
             return ["OK BYE", self.state_line()]
 
@@ -151,6 +168,14 @@ class Arbiter:
 
         if name == "STATUS":
             return ["OK STATUS", self.state_line()]
+
+        if name == "CHECK":
+            # A fresh roll-call every time, even from CHECK. The arm number is unchanged.
+            self.mode = CHECK
+            self.mask = []
+            self.winner = None
+            self.seen = []
+            return ["OK CHECK", self.state_line()]
 
         if name == "ARM":
             arm, ids = args
@@ -161,6 +186,7 @@ class Arbiter:
                     raise ProtocolError("BADID")
             self.arm = arm
             self.winner = None
+            self.seen = []
             self.mask = [p for p in self.player_ids if p in ids]
             self.mode = ARMED
             return ["OK ARM %d" % arm, self.state_line()]
@@ -169,9 +195,10 @@ class Arbiter:
         if args and args[0] != self.arm:
             raise ProtocolError("STALE")
         if name == "CLOSE":
-            if self.mode == ARMED:
+            if self.mode == ARMED or self.mode == CHECK:
                 self.mode = CLOSED
                 self.mask = []
+                self.seen = []
             # LOCKED keeps its winner; CLOSED is already closed.
         else:
             self._clear()
@@ -181,3 +208,4 @@ class Arbiter:
         self.mode = CLOSED
         self.mask = []
         self.winner = None
+        self.seen = []
