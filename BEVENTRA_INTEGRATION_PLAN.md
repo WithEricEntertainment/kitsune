@@ -190,7 +190,7 @@ the end of `PROTOCOL.md`. Summary: stock firmware worked (DIP switch 1 = debug, 
 our firmware booted; the protocol works end to end; one real bug found and fixed (`ProtocolError`
 called `Exception.__init__`, which MicroPython lacks; commit `e4e11bd` on `beventra-integration`,
 feature branches not yet patched). Reconnect, two-box race (20 tries), standalone and one-cable power
-all passed. Host-gone press also verified (instant sound, winner recoverable via `HELLO 1`). Still open: true same-ms presses. Upstream stays on hold.
+all passed. Control box in host mode verified; it exposed a STATE-flood bug in `main.py` (fixed, commit "Fix control box flooding a hosted link"). Host-gone press also verified (instant sound, winner recoverable via `HELLO 1`). Still open: true same-ms presses. Upstream stays on hold.
 
 ## Status and next steps (as of 2026-09-30)
 

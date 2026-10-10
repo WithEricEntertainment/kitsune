@@ -112,6 +112,10 @@ Checked on a real board over its middle USB-C port:
 - Host gone mid-round (serial closed without `BYE`, armed): a press still sounds instantly and the winner
   is held. The `BUZZ` line sent while nobody was reading is lost, but `HELLO 1` on reconnect reports
   `STATE <arm> LOCKED <id>`, so hosts must recover the winner from that, not from `BUZZ` alone.
+- Control box in host mode: no effect while armed; after a buzz it acts as `RESET` and pushes one
+  `STATE <arm> CLOSED` line per press. (Found on the board: the main loop used to reset on every pass
+  while the button was held, flooding the link with ~110 identical `STATE` lines per second; fixed
+  to act once per press.) Standalone flow re-checked after the fix.
 - Standalone with nothing reading the port: no delay. One cable (middle USB-C, 27V buzzer): no resets
   or disconnects across the session.
 
