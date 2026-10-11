@@ -25,8 +25,8 @@ class player_box():
 
 
 
-        if led_obj is not None:
-            self.led = led_obj
+        # update_led() reads self.led, so it must exist even when no LED was passed in
+        self.led = led_obj
         
         
 
