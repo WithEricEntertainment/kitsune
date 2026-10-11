@@ -41,7 +41,9 @@ class HostLink:
                 return
             if ch == "\n":
                 self._finish_line()
-            elif ch != "\r":
+            elif ch != "\r" and ch >= " " and ch != "\x7f":
+                # Other control characters (a modem probe, line noise) are not part of any
+                # command, so they are dropped rather than corrupting the line they land in.
                 if len(self.buf) < MAX_LINE:
                     self.buf += ch
                 else:
