@@ -10,7 +10,7 @@ Full spec: `PROTOCOL.md` in my fork. Code: `protocol.py` (parser and state, no h
 
 **Tested on a real v1.1.0 board (MicroPython 1.27)**
 
-Every command and error reply; a real press producing `BUZZ` then the locked state; reconnect (state survives a dropped connection; unplug and replug reboots to standalone); 20 near-simultaneous presses between two boxes giving exactly one winner each time; no delay when nothing is reading the port; one-cable power (27V buzzer) with no resets. It now also runs a real quiz night's console (a browser using Web Serial) end to end.
+Every command and error reply; a real press producing `BUZZ` then the locked state; reconnect (state survives a dropped connection; unplug and replug reboots to standalone); 20 near-simultaneous presses between two boxes giving exactly one winner each time; no delay when nothing is reading the port; one-cable power (27V buzzer) with no resets. I have also connected to it from a browser (Web Serial) and run a roll-call (below) on the real board.
 
 **Things I found on the way**
 
@@ -21,7 +21,7 @@ Every command and error reply; a real press producing `BUZZ` then the locked sta
 
 **An optional extra: roll-call**
 
-A `CHECK` command puts every port live so each first press lights its LED and keeps it lit, with no lockout and no sound, so a host can see which buzzers are in the room before a game. It is small (about 40 lines plus tests) and entirely separable; I'm happy to leave it out of any PR.
+A `CHECK` command puts every port live so each first press lights its LED and keeps it lit, with no lockout and no sound, so a host can see which buzzers are in the room before a game. It is small and entirely separable; I'm happy to leave it out of any PR.
 
 **Questions**
 
