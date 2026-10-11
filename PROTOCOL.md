@@ -144,8 +144,10 @@ Still open: true same-millisecond presses, weak USB chargers.
 
 Practical notes found on the board:
 
-- Stray bytes in the input line (e.g. Linux ModemManager probing a newly attached serial device) make
-  the next command fail once with `ERR UNKNOWN`. Hosts should send a blank line before `HELLO 1`
+- Stray bytes in the input line (e.g. Linux ModemManager probing a newly attached serial device) can
+  make the next command fail once with `ERR UNKNOWN`. The board drops control characters (anything
+  below space, and DEL) from the input, which covers binary noise; printable junk such as a modem's
+  `AT` probe still forms a line of its own, so hosts should still send a blank line before `HELLO 1`
   and ignore any line that doesn't start with `KIT `.
 - `mpremote` cannot connect while the board is in host mode (Ctrl-C is off); send `BYE` or replug.
   After any `mpremote` use the board is left at the MicroPython prompt; run `mpremote reset`.

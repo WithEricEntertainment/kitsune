@@ -51,6 +51,21 @@ def test_line_split_across_polls_and_crlf():
     assert w.lines()[0] == "KIT OK HELLO 1"
 
 
+def test_control_characters_inside_a_line_are_dropped():
+    hl, e, p, w = link()
+    w.feed("\x00\x1b\x03HEL\x7fLO\x01 1\n")
+    hl.poll()
+    assert w.lines()[0] == "KIT OK HELLO 1"
+
+
+def test_control_characters_alone_do_not_make_an_error():
+    hl, e, p, w = link()
+    w.feed("\x00\x01\x02\n")
+    hl.poll()
+    # An empty line is what a blank line already is: no reply and no error
+    assert "ERR" not in w.out
+
+
 def test_ctrl_c_disabled_only_while_hosted():
     hl, e, p, w = link()
     w.feed("STATUS\n")
