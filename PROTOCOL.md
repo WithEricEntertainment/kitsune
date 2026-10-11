@@ -99,7 +99,33 @@ device KIT STATE 42 CLOSED
 - **Ctrl-C is off** between `HELLO` and `BYE`, so a running script can't be interrupted over
   serial. Recover with `BYE`, `mpremote reset`, or unplugging.
 
-## Not yet verified on hardware
+## Verified on hardware
 
-Whether writes block when no host is attached, behaviour under near-simultaneous presses, and
-the reconnect sequence.
+Checked on a Kitsune++ v1.1.0 board (MicroPython 1.27) over its middle USB-C port:
+
+- Every command and the error replies (`NOHOST`, `STALE`, `BADID`, `UNKNOWN`) answer as documented.
+- A real button press produces `BUZZ` then `LOCKED`, and `RESET`/`CLOSE`/`BYE` return the right state.
+- Reconnect: dropping the serial connection without `BYE` keeps state, and `HELLO 1` reports it. A real
+  unplug and replug reboots the board to `STANDALONE`, arm 0.
+- Two boxes, 20 near-simultaneous tries: exactly one winner each time, no errors. Human timing only;
+  not proof of millisecond-level fairness.
+- Host gone mid-round (serial closed without `BYE`, armed): a press still sounds instantly and the winner
+  is held. The `BUZZ` line sent while nobody was reading is lost, but `HELLO 1` on reconnect reports
+  `STATE <arm> LOCKED <id>`, so hosts must recover the winner from that, not from `BUZZ` alone.
+- Control box in host mode: no effect while armed; after a buzz it acts as `RESET` and pushes one
+  `STATE <arm> CLOSED` line per press.
+- Standalone with nothing reading the port: no delay. One cable (middle USB-C, 27V buzzer): no resets
+  or disconnects across the session.
+
+Still open: true same-millisecond presses, weak USB chargers.
+
+Practical notes found on the board:
+
+- Stray bytes in the input line (e.g. Linux ModemManager probing a newly attached serial device) can
+  make the next command fail once with `ERR UNKNOWN`. The board drops control characters (anything
+  below space, and DEL) from the input, which covers binary noise; printable junk such as a modem's
+  `AT` probe still forms a line of its own, so hosts should send a blank line before `HELLO 1` and
+  ignore any line that doesn't start with `KIT `.
+- `mpremote` cannot connect while the board is in host mode (Ctrl-C is off); send `BYE` or replug.
+  After any `mpremote` use the board is left at the MicroPython prompt; run `mpremote reset`.
+- `BYE` keeps the last arm number; only a reboot resets it to 0.
